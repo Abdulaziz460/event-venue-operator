@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Venue Operator</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #050a0c;
+    color: #c7d4d6;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 12px;
+  }
+  .mono { font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .type-badge {
+    display: inline-block;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-weight: 600;
+    margin-left: 5px;
+    vertical-align: middle;
+  }
+  .type-first { color: #60a5fa; background: rgba(96, 165, 250, 0.18); border: 0.5px solid rgba(96, 165, 250, 0.4); }
+  .type-premier { color: #a78bfa; background: rgba(167, 139, 250, 0.18); border: 0.5px solid rgba(167, 139, 250, 0.4); }
+  .agent-pill-blue {
+    display: inline-flex; align-items: center; gap: 3px;
+    color: #60a5fa; font-size: 9px; letter-spacing: 0.06em;
+    padding: 2px 6px; background: rgba(96, 165, 250, 0.18);
+    border: 0.5px solid rgba(96, 165, 250, 0.4); border-radius: 2px; font-weight: 600;
+  }
+  .agent-pill-purple {
+    display: inline-flex; align-items: center; gap: 3px;
+    color: #a78bfa; font-size: 9px; letter-spacing: 0.06em;
+    padding: 2px 6px; background: rgba(167, 139, 250, 0.18);
+    border: 0.5px solid rgba(167, 139, 250, 0.4); border-radius: 2px; font-weight: 600;
+  }
+  .mem-tag {
+    display: inline-block; color: #a78bfa; font-size: 11px;
+    padding: 2px 6px; background: rgba(167, 139, 250, 0.12);
+    border-radius: 2px; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  /* Tab pane visibility */
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* Tab nav */
+  .tab-nav { display: flex; gap: 14px; font-size: 13px; letter-spacing: 0.05em; margin-bottom: 14px; color: #6b7e80; }
+  .tab-nav span { cursor: pointer; padding-bottom: 2px; white-space: nowrap; }
+  .tab-nav span.active { color: #00ed64; border-bottom: 2px solid #00ed64; }
+  .tab-nav .tab-sub { font-size: 10px; }
+  .tab-nav .check { color: #34d399; font-size: 10px; }
+
+  /* Step reveal transitions */
+  .step-entry {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 250ms ease-out, max-height 300ms ease-out;
+  }
+  .step-entry.revealed {
+    opacity: 1;
+    max-height: 500px;
+  }
+  .step-entry.revealed.dimmed {
+    opacity: 0.55;
+  }
+  .step-entry.revealed.active-step {
+    opacity: 1;
+    border-left: 3px solid var(--step-color, #34d399);
+    border-radius: 0 3px 3px 0;
+  }
+
+  /* Agent items (agenda rows + notifications) hidden until step 4 */
+  .agent-item {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    margin: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    transition: opacity 250ms ease-out, max-height 300ms ease-out, margin 300ms ease-out, padding 300ms ease-out;
+  }
+  .agent-item.revealed {
+    opacity: 1;
+    max-height: 500px;
+  }
+
+  /* Memory strip pulse */
+  @keyframes mem-pulse {
+    0% { background-color: rgba(167, 139, 250, 0.05); }
+    50% { background-color: rgba(167, 139, 250, 0.25); }
+    100% { background-color: rgba(167, 139, 250, 0.05); }
+  }
+  .mem-pulse {
+    animation: mem-pulse 600ms ease-in-out 1;
+  }
+  @keyframes mem-flash-green {
+    0% { background-color: rgba(167, 139, 250, 0.05); }
+    30% { background-color: rgba(52, 211, 153, 0.25); }
+    100% { background-color: rgba(167, 139, 250, 0.05); }
+  }
+  .mem-flash-green {
+    animation: mem-flash-green 800ms ease-in-out 1;
+  }
+
+  /* Placeholder for empty agent log */
+  .log-placeholder {
+    color: #4a5a5c;
+    font-size: 11px;
+    text-align: center;
+    padding: 40px 0;
+    transition: opacity 200ms ease-out;
+  }
+
+  .scenario-hero {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(52, 211, 153, 0.05));
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 18px;
+    cursor: pointer;
+  }
+  .scenario-eyebrow {
+    color: #fbbf24;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    padding: 3px 7px;
+    background: rgba(245, 158, 11, 0.18);
+    border-radius: 3px;
+    font-weight: 700;
+  }
+  .scenario-title {
+    color: #f0f6f7;
+    font-size: 16px;
+    font-weight: 650;
+    line-height: 1.35;
+  }
+  .scenario-subtitle {
+    color: #a8b5b7;
+    font-size: 12px;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+  .scenario-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+  .scenario-primary {
+    background: #34d399;
+    border: none;
+    color: #071113;
+    padding: 8px 16px;
+    font-size: 11px;
+    border-radius: 5px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .scenario-secondary {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid #2a3f44;
+    color: #a8b5b7;
+    padding: 8px 12px;
+    font-size: 11px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .scenario-progress {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .scenario-progress span {
+    color: #8a9b9d;
+    background: #081315;
+    border: 1px solid #1f2f32;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  .scenario-progress span.active {
+    color: #071113;
+    background: #34d399;
+    border-color: #34d399;
+    font-weight: 700;
+  }
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.05fr);
+    gap: 16px;
+    align-items: start;
+  }
+  .scenario-panel {
+    background: #060f11;
+    border: 1px solid #1f2f32;
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+  .scenario-panel-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #1a2729;
+  }
+  .scenario-panel-label {
+    color: #b8c5c7;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 650;
+  }
+  .scenario-panel-help {
+    color: #6b7e80;
+    font-size: 11px;
+    margin-top: 3px;
+  }
+  .persona-switch { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .persona-switch button {
+    padding: 6px 10px;
+    font-size: 11px;
+    border-radius: 5px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+  }
+  .phone-card {
+    background: #0a1517;
+    border: 1px solid #1f2f32;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .step-entry.revealed.active-step .step-card {
+    border-color: var(--step-color, #34d399) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--step-color, #34d399) 25%, transparent);
+  }
+  .step-card {
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid #1f2f32;
+    border-radius: 6px;
+    padding: 11px 14px;
+  }
+  @media (max-width: 980px) {
+    .scenario-hero { align-items: flex-start; flex-direction: column; }
+    .scenario-actions { width: 100%; }
+    .scenario-actions button { flex: 1; }
+    .scenario-grid { grid-template-columns: 1fr; }
+    .scenario-progress { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div style="background: #0d1b1e; padding: 20px; border-radius: 6px;">
+
+  <!-- ===== HEADER ===== -->
+  <div style="background: #0a1517; border: 0.5px solid #2a3f44; padding: 12px 16px; border-radius: 5px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div style="width: 24px; height: 24px; background: #00ed64; border-radius: 5px; display: flex; align-items: center; justify-content: center;">
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="#0a1517"><path d="M7 1L8.5 5h4l-3.2 2.8L10.5 12 7 9.5 3.5 12l1.2-4.2L1.5 5h4z"/></svg>
+      </div>
+      <div style="color: #f0f6f7; font-size: 14px; font-weight: 500;">MONGODB OPEN</div>
+      <div style="color: #b8c5c7; font-size: 12px;">Premier Tournament &middot; Day 6</div>
+    </div>
+    <div id="header-clock" class="mono" style="color: #8a9b9d; font-size: 12px;">2:15pm</div>
+  </div>
+
+  <!-- ===== TAB NAV ===== -->
+  <div class="tab-nav" id="tab-nav">
+    <span class="active" data-tab="venue-ops">1 VENUE OPS</span>
+    <span data-tab="scenario1">2 SCENARIO <span class="tab-sub" id="tab2-sub">(rain)</span></span>
+    <span data-tab="outcomes">3 FINAL OUTCOMES</span>
+    <span data-tab="live-backend">4 LIVE BACKEND</span>
+  </div>
+
+  <!-- ===== TAB 1: VENUE OPS ===== -->
+  <div class="tab-pane active" id="pane-venue-ops">
+
+    <!-- KPI Tiles -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 18px;">
+      <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 5px; padding: 18px 20px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #fbbf24;"></div>
+        <div style="color: #a8b5b7; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;">Visitors retained</div>
+        <div style="color: #f0f6f7; font-size: 32px; font-weight: 500;">42,180</div>
+        <div class="mono" style="color: #34d399; font-size: 12px;">of 48,000 ticketed</div>
+      </div>
+      <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 5px; padding: 18px 20px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #a78bfa;"></div>
+        <div style="color: #a8b5b7; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;">Court fill rate</div>
+        <div style="color: #f0f6f7; font-size: 32px; font-weight: 500;">82%</div>
+        <div class="mono" style="color: #a8b5b7; font-size: 12px;">across 18 courts</div>
+      </div>
+      <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 5px; padding: 18px 20px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #34d399;"></div>
+        <div style="color: #a8b5b7; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;">Revenue capture</div>
+        <div class="mono" style="color: #34d399; font-size: 32px; font-weight: 500;">&pound;820K</div>
+        <div class="mono" style="color: #a8b5b7; font-size: 12px;">of &pound;2.1M projected</div>
+      </div>
+      <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 5px; padding: 18px 20px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #fbbf24;"></div>
+        <div style="color: #a8b5b7; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;">Reputation</div>
+        <div style="color: #f0f6f7; font-size: 32px; font-weight: 500;">4.7<span style="color: #fbbf24; font-size: 24px;">&#9733;</span></div>
+        <div class="mono" style="color: #a8b5b7; font-size: 12px;">vs 3.9&#9733; comparable</div>
+      </div>
+    </div>
+
+    <!-- Live Venue Status -->
+    <div style="background: #060f11; border: 0.5px solid #1f2f32; border-radius: 4px; padding: 18px 22px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 0.5px solid #1a2729;">
+        <div>
+          <div style="color: #b8c5c7; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500;">Live Venue Status</div>
+                  </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="color: #fbbf24; font-size: 11px;">&#9928;</span>
+          <span style="color: #fbbf24; font-size: 11px; letter-spacing: 0.04em;">weather: rain 90m out</span>
+        </div>
+      </div>
+      <div style="margin-bottom: 30px;">
+        <div style="color: #8a9b9d; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px;">Courts</div>
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px;">
+          <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="color: #f0f6f7; font-size: 13px; font-weight: 500;">Centre Court</span>
+              <span style="color: #34d399; font-size: 9px; letter-spacing: 0.06em; padding: 2px 6px; background: rgba(52, 211, 153, 0.15); border-radius: 2px; font-weight: 600;">MARQUEE</span>
+            </div>
+            <div class="mono" style="color: #34d399; font-size: 18px; font-weight: 500; margin-bottom: 4px;">98%</div>
+            <div style="color: #8a9b9d; font-size: 11px;">Set 3 &middot; 4-2</div>
+          </div>
+          <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+            <div style="margin-bottom: 6px;"><span style="color: #f0f6f7; font-size: 13px; font-weight: 500;">No.1 Court</span></div>
+            <div class="mono" style="color: #f0f6f7; font-size: 18px; font-weight: 500; margin-bottom: 4px;">85%</div>
+            <div style="color: #8a9b9d; font-size: 11px;">Doubles QF &middot; 2nd set</div>
+          </div>
+          <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+            <div style="margin-bottom: 6px;"><span style="color: #f0f6f7; font-size: 13px; font-weight: 500;">Court 2</span></div>
+            <div class="mono" style="color: #f0f6f7; font-size: 18px; font-weight: 500; margin-bottom: 4px;">74%</div>
+            <div style="color: #8a9b9d; font-size: 11px;">Singles R32 &middot; 1st set</div>
+          </div>
+          <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+            <div style="margin-bottom: 6px;"><span style="color: #f0f6f7; font-size: 13px; font-weight: 500;">Court 3</span></div>
+            <div class="mono" style="color: #f0f6f7; font-size: 18px; font-weight: 500; margin-bottom: 4px;">71%</div>
+            <div style="color: #8a9b9d; font-size: 11px;">Mixed Doubles &middot; 3rd set</div>
+          </div>
+          <div style="background: #0a1517; border: 0.5px solid rgba(245, 158, 11, 0.4); border-radius: 4px; padding: 12px 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="color: #f0f6f7; font-size: 13px; font-weight: 500;">Court 5</span>
+              <span style="color: #fbbf24; font-size: 9px; letter-spacing: 0.06em; padding: 2px 6px; background: rgba(245, 158, 11, 0.15); border-radius: 2px; font-weight: 600;">FLAGGED</span>
+            </div>
+            <div class="mono" style="color: #fbbf24; font-size: 18px; font-weight: 500; margin-bottom: 4px;">60%</div>
+            <div style="color: #8a9b9d; font-size: 11px;">Singles R16 &middot; pre-match</div>
+          </div>
+          <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"><span style="color: #f0f6f7; font-size: 13px; font-weight: 500;">Outer</span><span style="color: #8a9b9d; font-size: 9px; letter-spacing: 0.06em; padding: 2px 6px; background: rgba(138, 155, 157, 0.15); border-radius: 2px; font-weight: 600;">+13</span></div>
+            <div class="mono" style="color: #f0f6f7; font-size: 18px; font-weight: 500; margin-bottom: 4px;">68%</div>
+            <div style="color: #8a9b9d; font-size: 11px;">avg &middot; 9 active</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div style="color: #8a9b9d; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px;">Hospitality &amp; Concessions</div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+          <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="color: #f0f6f7; font-size: 13px; font-weight: 500;">Members' Lounge</span>
+              <span style="color: #a78bfa; font-size: 9px; letter-spacing: 0.06em; padding: 2px 6px; background: rgba(167, 139, 250, 0.15); border-radius: 2px; font-weight: 600;">PREMIUM</span>
+            </div>
+            <div class="mono" style="color: #f0f6f7; font-size: 18px; font-weight: 500; margin-bottom: 4px;">91%</div>
+            <div style="color: #8a9b9d; font-size: 11px;">debenture holders &middot; 12 tables free</div>
+          </div>
+          <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+            <div style="margin-bottom: 6px;"><span style="color: #f0f6f7; font-size: 13px; font-weight: 500;">Champions Grill</span></div>
+            <div class="mono" style="color: #f0f6f7; font-size: 18px; font-weight: 500; margin-bottom: 4px;">76%</div>
+            <div style="color: #8a9b9d; font-size: 11px;">lunch service &middot; 28 covers free</div>
+          </div>
+          <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+            <div style="margin-bottom: 6px;"><span style="color: #f0f6f7; font-size: 13px; font-weight: 500;">Pro Shop</span></div>
+            <div class="mono" style="color: #f0f6f7; font-size: 18px; font-weight: 500; margin-bottom: 4px;">54%</div>
+            <div style="color: #8a9b9d; font-size: 11px;">covered seating avail</div>
+          </div>
+          <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="color: #f0f6f7; font-size: 13px; font-weight: 500;">Hospitality Pavilion</span>
+              <span style="color: #a78bfa; font-size: 9px; letter-spacing: 0.06em; padding: 2px 6px; background: rgba(167, 139, 250, 0.15); border-radius: 2px; font-weight: 600;">PREMIUM</span>
+            </div>
+            <div class="mono" style="color: #f0f6f7; font-size: 18px; font-weight: 500; margin-bottom: 4px;">82%</div>
+            <div style="color: #8a9b9d; font-size: 11px;">Le Gavroche popup &middot; 8 tables free</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== TAB 2: SCENARIO 1 (RAIN) ===== -->
+  <div class="tab-pane" id="pane-scenario1">
+
+    <!-- Scenario banner -->
+    <div id="s1-banner" class="scenario-hero" onclick="s1Advance()">
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap;">
+          <span class="scenario-eyebrow">RAIN PLAYBOOK</span>
+          <span class="scenario-title">Rain is 90 minutes out. The agent needs to keep visitors on-site.</span>
+        </div>
+        <div class="scenario-subtitle">Court 5 has open seats, Centre Court is wrapping, and hospitality capacity is about to become scarce.</div>
+      </div>
+      <div class="scenario-actions" onclick="event.stopPropagation()">
+        <button id="s1-start-btn" class="scenario-primary" onclick="s1Advance()">&#9654; START</button>
+        <button class="scenario-secondary" onclick="s1Reset()">RESET</button>
+      </div>
+    </div>
+
+    <div class="scenario-progress" id="s1-progress">
+      <span data-progress-step="1">Read Live State</span>
+      <span data-progress-step="2">Retrieve Memory</span>
+      <span data-progress-step="3">Plan</span>
+      <span data-progress-step="4">Act</span>
+      <span data-progress-step="5">Write Back</span>
+    </div>
+
+    <div class="scenario-grid">
+
+      <!-- LEFT: Visitor View -->
+      <div id="s1-visitor" class="scenario-panel" style="transition: opacity 250ms ease-out;">
+        <div class="scenario-panel-header">
+          <div>
+            <div class="scenario-panel-label">Visitor View</div>
+            <div class="scenario-panel-help">Toggle personas to see how the same rain signal becomes different actions.</div>
+          </div>
+        </div>
+
+        <div class="persona-switch">
+          <button id="s1-btn-frankie" onclick="s1Toggle('frankie')" style="background: rgba(96, 165, 250, 0.15); border: 1px solid rgba(96, 165, 250, 0.5); color: #60a5fa; font-weight: 600;">
+            Mikiko <span class="type-badge type-first">FIRST-TIMER</span>
+          </button>
+          <button id="s1-btn-miki" onclick="s1Toggle('miki')" style="background: transparent; border: 1px solid #2a3f44; color: #8a9b9d;">
+            Nina <span class="type-badge type-premier">PREMIER</span>
+          </button>
+        </div>
+
+        <!-- FRANKIE -->
+        <div id="s1-frankie">
+          <div id="s1-mem-f" style="background: rgba(167, 139, 250, 0.05); border: 0.5px solid rgba(167, 139, 250, 0.25); border-left: 2px solid #a78bfa; border-radius: 0 4px 4px 0; padding: 10px 14px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <span style="color: #a78bfa; font-size: 10px; letter-spacing: 0.06em; font-weight: 600;">WHAT THE AGENT KNOWS &middot; long-term memory</span>
+              <span style="color: #6b7e80; font-size: 10px;">4 facts retrieved</span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+              <span class="mem-tag">first visit &middot; ticket scan</span>
+              <span class="mem-tag">day pass &middot; exploring grounds</span>
+              <span class="mem-tag">pref&middot;matches</span>
+              <span class="mem-tag">no premium history</span>
+            </div>
+          </div>
+
+          <div class="phone-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <div>
+                <div style="color: #f0f6f7; font-size: 13px; font-weight: 500; display: flex; align-items: center;">Your Day &middot; Mikiko <span class="type-badge type-first">FIRST-TIMER</span></div>
+                <div style="color: #6b7e80; font-size: 11px; margin-top: 2px;">First visit &middot; arrived 11:00am</div>
+              </div>
+              <div class="mono" style="color: #6b7e80; font-size: 11px;">2:15pm</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid #1a2729; font-size: 12px; align-items: center; opacity: 0.5;">
+              <span class="mono" style="color: #6b7e80;">11:30am</span><span style="color: #a8b5b7;">Centre Court &middot; Set 2 watched</span><span style="color: #4a5a5c; font-size: 10px;">done</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid #1a2729; font-size: 12px; align-items: center; opacity: 0.5;">
+              <span class="mono" style="color: #6b7e80;">1:15pm</span><span style="color: #a8b5b7;">Champions Grill &middot; lunch</span><span style="color: #4a5a5c; font-size: 10px;">done</span>
+            </div>
+            <div class="agent-item" data-s1-step="4" style="display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; padding: 10px 8px; background: rgba(96, 165, 250, 0.1); border: 0.5px solid rgba(96, 165, 250, 0.4); border-radius: 4px; font-size: 12px; align-items: center; margin: 4px 0;">
+              <span class="mono" style="color: #60a5fa; font-weight: 500;">2:45pm</span>
+              <span><div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;"><span class="agent-pill-blue">+ AGENT ADDED</span></div><span style="color: #f0f6f7; font-weight: 500;">Court 5 &middot; Singles R16</span><div style="color: #b8c5c7; font-size: 11px; margin-top: 2px;">4-min walk &middot; 60% capacity, easy seat</div></span>
+              <span style="color: #60a5fa; font-size: 10px;">new</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; padding: 6px 0; font-size: 12px; align-items: center; opacity: 0.5;">
+              <span class="mono" style="color: #6b7e80;">5:00pm</span><span style="color: #a8b5b7;">No.1 Court &middot; Doubles QF</span><span style="color: #4a5a5c; font-size: 10px;">later</span>
+            </div>
+          </div>
+
+          <div class="agent-item" data-s1-step="4" style="background: rgba(96, 165, 250, 0.08); border: 0.5px solid rgba(96, 165, 250, 0.4); border-left: 3px solid #60a5fa; border-radius: 0 4px 4px 0; padding: 12px 16px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div style="display: flex; align-items: center; gap: 6px;"><span class="agent-pill-blue">+ AGENT SENT</span><span style="color: #60a5fa; font-size: 10px; letter-spacing: 0.06em; font-weight: 600;">PUSH &middot; 2:15pm</span></div>
+            </div>
+            <div style="color: #f0f6f7; font-size: 13px; font-weight: 500; margin-bottom: 4px;">Catch a great match &mdash; easy seat</div>
+            <div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">Singles R16 starts in 30m on Court 5. 60% capacity, no queue. 4-min walk from where you are.</div>
+          </div>
+          <div class="agent-item" data-s1-step="4" style="background: rgba(245, 158, 11, 0.08); border: 0.5px solid rgba(245, 158, 11, 0.4); border-left: 3px solid #fbbf24; border-radius: 0 4px 4px 0; padding: 12px 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div style="display: flex; align-items: center; gap: 6px;"><span class="agent-pill-blue">+ AGENT SENT</span><span style="color: #fbbf24; font-size: 10px; letter-spacing: 0.06em; font-weight: 600;">WEATHER &middot; 2:15pm</span></div>
+            </div>
+            <div style="color: #f0f6f7; font-size: 13px; font-weight: 500; margin-bottom: 4px;">Rain expected at 3:45pm</div>
+            <div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">Pro Shop has covered seating with big screens. Strawberries &amp; cream available there too.</div>
+          </div>
+        </div>
+
+        <!-- MIKI -->
+        <div id="s1-miki" style="display: none;">
+          <div id="s1-mem-m" style="background: rgba(167, 139, 250, 0.05); border: 0.5px solid rgba(167, 139, 250, 0.25); border-left: 2px solid #a78bfa; border-radius: 0 4px 4px 0; padding: 10px 14px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <span style="color: #a78bfa; font-size: 10px; letter-spacing: 0.06em; font-weight: 600;">WHAT THE AGENT KNOWS &middot; long-term memory</span>
+              <span style="color: #6b7e80; font-size: 10px;">5 facts retrieved</span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+              <span class="mem-tag">premier access</span>
+              <span class="mem-tag">pref&middot;covered_seating</span>
+              <span class="mem-tag">hospitality history</span>
+              <span class="mem-tag">high engagement signal</span>
+              <span class="mem-tag">no dietary restrictions</span>
+            </div>
+          </div>
+
+          <div class="phone-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <div>
+                <div style="color: #f0f6f7; font-size: 13px; font-weight: 500; display: flex; align-items: center;">Your Day &middot; Nina <span class="type-badge type-premier">PREMIER</span></div>
+                <div style="color: #6b7e80; font-size: 11px; margin-top: 2px;">Premier access &middot; Centre Court</div>
+              </div>
+              <div class="mono" style="color: #6b7e80; font-size: 11px;">2:15pm</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid #1a2729; font-size: 12px; align-items: center; opacity: 0.5;">
+              <span class="mono" style="color: #6b7e80;">11:00am</span><span style="color: #a8b5b7;">Members' Lounge &middot; breakfast</span><span style="color: #4a5a5c; font-size: 10px;">done</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid #1a2729; font-size: 12px; align-items: center; opacity: 0.5;">
+              <span class="mono" style="color: #6b7e80;">12:30pm</span><span style="color: #a8b5b7;">Centre Court &middot; Marin vs Kova&#269;</span><span style="color: #4a5a5c; font-size: 10px;">watching</span>
+            </div>
+            <div class="agent-item" data-s1-step="4" style="display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; padding: 10px 8px; background: rgba(167, 139, 250, 0.1); border: 0.5px solid rgba(167, 139, 250, 0.4); border-radius: 4px; font-size: 12px; align-items: center; margin: 4px 0;">
+              <span class="mono" style="color: #a78bfa; font-weight: 500;">3:00pm</span>
+              <span><div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;"><span class="agent-pill-purple">+ AGENT RESERVED</span></div><span style="color: #f0f6f7; font-weight: 500;">Hospitality Pavilion &middot; table for 1</span><div style="color: #b8c5c7; font-size: 11px; margin-top: 2px;">Le Gavroche tasting &middot; covered seating &middot; table service</div></span>
+              <span style="color: #a78bfa; font-size: 10px;">held</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; padding: 6px 0; font-size: 12px; align-items: center; opacity: 0.5;">
+              <span class="mono" style="color: #6b7e80;">5:30pm</span><span style="color: #a8b5b7;">Centre Court &middot; Doubles Final</span><span style="color: #4a5a5c; font-size: 10px;">later</span>
+            </div>
+          </div>
+
+          <div class="agent-item" data-s1-step="4" style="background: rgba(167, 139, 250, 0.08); border: 0.5px solid rgba(167, 139, 250, 0.4); border-left: 3px solid #a78bfa; border-radius: 0 4px 4px 0; padding: 12px 16px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div style="display: flex; align-items: center; gap: 6px;"><span class="agent-pill-purple">+ AGENT SENT</span><span style="color: #a78bfa; font-size: 10px; letter-spacing: 0.06em; font-weight: 600;">RESERVATION &middot; 2:15pm</span></div>
+            </div>
+            <div style="color: #f0f6f7; font-size: 13px; font-weight: 500; margin-bottom: 4px;">Your 3pm table is ready, Nina</div>
+            <div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">Hospitality Pavilion held a covered seat for you. Le Gavroche tasting menu available. Staff briefed on your usual.</div>
+          </div>
+          <div class="agent-item" data-s1-step="4" style="background: rgba(245, 158, 11, 0.08); border: 0.5px solid rgba(245, 158, 11, 0.4); border-left: 3px solid #fbbf24; border-radius: 0 4px 4px 0; padding: 12px 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div style="display: flex; align-items: center; gap: 6px;"><span class="agent-pill-purple">+ AGENT SENT</span><span style="color: #fbbf24; font-size: 10px; letter-spacing: 0.06em; font-weight: 600;">WEATHER &middot; 2:15pm</span></div>
+            </div>
+            <div style="color: #f0f6f7; font-size: 13px; font-weight: 500; margin-bottom: 4px;">Rain expected at 3:45pm</div>
+            <div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">Your Pavilion table is fully covered. No need to move when the weather turns.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Agent Log -->
+      <div class="scenario-panel">
+        <div class="scenario-panel-header">
+          <div>
+            <div class="scenario-panel-label">Agent Decision Trace</div>
+            <div class="scenario-panel-help">Each step maps to a backend pattern readers can inspect in the repo.</div>
+          </div>
+          <div style="display: flex; gap: 12px; font-size: 11px; color: #8a9b9d; align-items: center;">
+            <span>9 memories retrieved</span>
+          </div>
+        </div>
+
+        <div id="s1-log-placeholder" class="log-placeholder">Click &#9654; START to begin scenario</div>
+
+        <!-- Step 1: READ short-term -->
+        <div class="step-entry" data-s1-step="1" style="--step-color: #34d399; display: grid; grid-template-columns: 30px 1fr; gap: 10px; margin-bottom: 10px;">
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(52, 211, 153, 0.15); border: 0.5px solid #34d399; display: flex; align-items: center; justify-content: center; color: #34d399; font-size: 9px; font-weight: 600;">R</div>
+            <div style="width: 1px; flex: 1; background: #1f2f32; margin-top: 4px;"></div>
+          </div>
+          <div class="step-card">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: #34d399; font-size: 11px; letter-spacing: 0.06em; font-weight: 600;">READ &middot; short-term</span>
+              <span class="mono" style="color: #6b7e80; font-size: 10px;">14:45:12</span>
+            </div>
+            <div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">foot traffic &darr;18% &middot; concessions &darr;9% &middot; Court 5 at 60% &middot; weather ETA 90m &middot; Centre Court Set 3 4-2</div>
+            <div class="mono" style="margin-top: 6px; color: #34d399; font-size: 11px;">pattern: outer_court_drift + weather_window &middot; 0.84</div>
+          </div>
+        </div>
+
+        <!-- Step 2: READ long-term -->
+        <div class="step-entry" data-s1-step="2" style="--step-color: #34d399; display: grid; grid-template-columns: 30px 1fr; gap: 10px; margin-bottom: 10px;">
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(52, 211, 153, 0.15); border: 0.5px solid #34d399; display: flex; align-items: center; justify-content: center; color: #34d399; font-size: 9px; font-weight: 600;">R</div>
+            <div style="width: 1px; flex: 1; background: #1f2f32; margin-top: 4px;"></div>
+          </div>
+          <div class="step-card">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: #34d399; font-size: 11px; letter-spacing: 0.06em; font-weight: 600;">READ &middot; long-term memory</span>
+              <span class="mono" style="color: #6b7e80; font-size: 10px;">14:45:13</span>
+            </div>
+            <div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">Vector search retrieved 12 candidate patterns from persona namespace. Voyage reranker surfaced top 2: <span style="color: #a78bfa;">V2&middot;rain_delay</span> (+34% covered shop) and <span style="color: #a78bfa;">FLEET&middot;segmented_3x</span> (3.4&times; general push).</div>
+            <div class="mono" style="margin-top: 6px; color: #34d399; font-size: 11px;">source: Voyage embed + reranker &middot; Atlas Vector Search &middot; cosine 0.91</div>
+          </div>
+        </div>
+
+        <!-- Step 3: PLAN -->
+        <div class="step-entry" data-s1-step="3" style="--step-color: #a78bfa; display: grid; grid-template-columns: 30px 1fr; gap: 10px; margin-bottom: 10px;">
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(167, 139, 250, 0.15); border: 0.5px solid #a78bfa; display: flex; align-items: center; justify-content: center; color: #a78bfa; font-size: 9px; font-weight: 600;">P</div>
+            <div style="width: 1px; flex: 1; background: #1f2f32; margin-top: 4px;"></div>
+          </div>
+          <div class="step-card">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: #a78bfa; font-size: 11px; letter-spacing: 0.06em; font-weight: 600;">PLAN &middot; long-term + shared</span>
+              <span class="mono" style="color: #6b7e80; font-size: 10px;">14:45:14</span>
+            </div>
+            <div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">Vector search retrieved <span style="color: #a78bfa;">V2&middot;rain_delay</span> (+34% covered shop revenue). Cross-checked Pavilion capacity (82%) and staff schedule.</div>
+            <div class="mono" style="margin-top: 6px; color: #a78bfa; font-size: 11px;">strategy: segment by persona &middot; parallel actions</div>
+          </div>
+        </div>
+
+        <!-- Step 4: ACT -->
+        <div class="step-entry" data-s1-step="4" style="--step-color: #60a5fa; display: grid; grid-template-columns: 30px 1fr; gap: 10px; margin-bottom: 10px;">
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(96, 165, 250, 0.15); border: 0.5px solid #60a5fa; display: flex; align-items: center; justify-content: center; color: #60a5fa; font-size: 9px; font-weight: 600;">A</div>
+            <div style="width: 1px; flex: 1; background: #1f2f32; margin-top: 4px;"></div>
+          </div>
+          <div class="step-card">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: #60a5fa; font-size: 11px; letter-spacing: 0.06em; font-weight: 600;">ACT &middot; 2 personas</span>
+              <span class="mono" style="color: #6b7e80; font-size: 10px;">14:45:18</span>
+            </div>
+            <div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">
+              <div style="color: #8a9b9d; margin-bottom: 4px;">Orchestrator &rarr; Personalization + Hospitality sub-agents (parallel)</div>
+              <div>&middot; Mikiko <span class="type-badge type-first">FIRST-TIMER</span> &rarr; push Court 5 tip</div>
+              <div>&middot; Nina <span class="type-badge type-premier">PREMIER</span> &rarr; reserve Pavilion 3pm</div>
+              <div>&middot; Hospitality sub-agent &rarr; +2 wait staff Pavilion</div>
+              <div>&middot; Personalization sub-agent &rarr; weather notice both personas</div>
+            </div>
+            <div class="mono" style="margin-top: 6px; color: #60a5fa; font-size: 11px;">expected lift: +&pound;2,200/min during rain window</div>
+          </div>
+        </div>
+
+        <!-- Step 5: WRITE -->
+        <div class="step-entry" data-s1-step="5" style="--step-color: #fbbf24; display: grid; grid-template-columns: 30px 1fr; gap: 10px;">
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div style="width: 22px; height: 22px; border-radius: 50%; background: rgba(245, 158, 11, 0.15); border: 0.5px solid #fbbf24; display: flex; align-items: center; justify-content: center; color: #fbbf24; font-size: 9px; font-weight: 600;">W</div>
+          </div>
+          <div class="step-card">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: #fbbf24; font-size: 11px; letter-spacing: 0.06em; font-weight: 600;">WRITE &middot; long-term</span>
+              <span class="mono" style="color: #6b7e80; font-size: 10px;">14:45:24</span>
+            </div>
+            <div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">Outcome logged: outer_court_drift + weather_window 90m &rarr; segmented push + Pavilion reservation.</div>
+            <div class="mono" style="margin-top: 6px; color: #fbbf24; font-size: 11px;">written: V3&middot;rain_segmented_outreach &middot; Atlas</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ===== TAB 3: FINAL OUTCOMES ===== -->
+  <!-- TODO: Future work should gate Tab 3 visibility behind scenario completing -->
+  <div class="tab-pane" id="pane-outcomes">
+    <div style="background: rgba(52, 211, 153, 0.08); border: 0.5px solid rgba(52, 211, 153, 0.4); border-radius: 4px; padding: 14px 20px; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
+      <span style="color: #34d399; font-size: 10px; letter-spacing: 0.06em; padding: 3px 8px; background: rgba(52, 211, 153, 0.2); border-radius: 2px; font-weight: 600;">DAY COMPLETE</span>
+      <span style="color: #f0f6f7; font-size: 14px; font-weight: 500;">Rain delay handled</span>
+      <span style="color: #8a9b9d; font-size: 12px;">&middot;</span>
+      <span style="color: #34d399; font-size: 14px; font-weight: 500;">F&amp;B +28% during rain</span>
+      <span style="color: #8a9b9d; font-size: 12px;">&middot;</span>
+      <span style="color: #34d399; font-size: 14px; font-weight: 500;">5 patterns written</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 18px;">
+      <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 5px; padding: 18px 20px; position: relative; overflow: hidden;"><div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #fbbf24;"></div><div style="color: #a8b5b7; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;">Visitors retained</div><div style="color: #f0f6f7; font-size: 32px; font-weight: 500;">94%</div><div class="mono" style="color: #34d399; font-size: 11px;">+12pts vs comparable rain day</div></div>
+      <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 5px; padding: 18px 20px; position: relative; overflow: hidden;"><div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #a78bfa;"></div><div style="color: #a8b5b7; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;">Court fill rate</div><div style="color: #f0f6f7; font-size: 32px; font-weight: 500;">87%</div><div class="mono" style="color: #34d399; font-size: 11px;">+5pts vs morning</div></div>
+      <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 5px; padding: 18px 20px; position: relative; overflow: hidden;"><div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #34d399;"></div><div style="color: #a8b5b7; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;">Revenue capture</div><div style="color: #34d399; font-size: 32px; font-weight: 500;">&pound;2.34M</div><div class="mono" style="color: #34d399; font-size: 11px;">+&pound;240K vs baseline</div></div>
+      <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 5px; padding: 18px 20px; position: relative; overflow: hidden;"><div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #fbbf24;"></div><div style="color: #a8b5b7; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;">Reputation</div><div style="color: #f0f6f7; font-size: 32px; font-weight: 500;">4.8<span style="color: #fbbf24; font-size: 24px;">&#9733;</span></div><div class="mono" style="color: #34d399; font-size: 11px;">+1.1 stars vs comparable</div></div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+      <div style="background: #060f11; border: 0.5px solid rgba(96, 165, 250, 0.3); border-radius: 4px; padding: 16px 20px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 0.5px solid #1a2729;"><div style="color: #f0f6f7; font-size: 13px; font-weight: 500; display: flex; align-items: center;">Mikiko <span class="type-badge type-first">FIRST-TIMER</span></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;"><div><div style="color: #8a9b9d; font-size: 11px; letter-spacing: 0.06em; margin-bottom: 3px;">SPEND</div><div class="mono" style="color: #34d399; font-size: 28px; font-weight: 500;">&pound;68</div><div style="color: #8a9b9d; font-size: 11px;">+&pound;26 vs trigger</div></div><div><div style="color: #8a9b9d; font-size: 11px; letter-spacing: 0.06em; margin-bottom: 3px;">TIME ON-SITE</div><div class="mono" style="color: #f0f6f7; font-size: 28px; font-weight: 500;">9.2h</div><div style="color: #8a9b9d; font-size: 11px;">stayed through rain</div></div></div><div style="padding-top: 8px; border-top: 0.5px solid #1a2729;"><div style="color: #34d399; font-size: 10px; letter-spacing: 0.06em; margin-bottom: 5px;">&rarr; NEXT TIME</div><div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;"><span style="color: #34d399;">Return-likely</span> &middot; multi-day pass queued</div></div></div>
+      <div style="background: #060f11; border: 0.5px solid rgba(167, 139, 250, 0.3); border-radius: 4px; padding: 16px 20px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 0.5px solid #1a2729;"><div style="color: #f0f6f7; font-size: 13px; font-weight: 500; display: flex; align-items: center;">Nina <span class="type-badge type-premier">PREMIER</span></div></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;"><div><div style="color: #8a9b9d; font-size: 11px; letter-spacing: 0.06em; margin-bottom: 3px;">SPEND</div><div class="mono" style="color: #34d399; font-size: 28px; font-weight: 500;">&pound;825</div><div style="color: #8a9b9d; font-size: 11px;">+&pound;485 vs trigger</div></div><div><div style="color: #8a9b9d; font-size: 11px; letter-spacing: 0.06em; margin-bottom: 3px;">TIME ON-SITE</div><div class="mono" style="color: #f0f6f7; font-size: 28px; font-weight: 500;">11.5h</div><div style="color: #8a9b9d; font-size: 11px;">extended dining</div></div></div><div style="padding-top: 8px; border-top: 0.5px solid #1a2729;"><div style="color: #34d399; font-size: 10px; letter-spacing: 0.06em; margin-bottom: 5px;">&rarr; NEXT TIME</div><div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;"><span style="color: #a78bfa;">Covered seating preference</span> &middot; premier access retained</div></div></div>
+    </div>
+    <div style="background: rgba(52, 211, 153, 0.05); border: 0.5px solid rgba(52, 211, 153, 0.3); border-left: 3px solid #34d399; border-radius: 0 4px 4px 0; padding: 16px 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"><div><span style="color: #34d399; font-size: 11px; letter-spacing: 0.06em; font-weight: 600;">WRITTEN TO LONG-TERM MEMORY</span><span style="color: #f0f6f7; font-size: 13px; margin-left: 8px;">5 patterns written</span></div><span class="mono" style="color: #6b7e80; font-size: 11px;">Voyage embed + reranker &middot; Atlas</span></div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+        <div style="background: rgba(52, 211, 153, 0.04); border: 0.5px solid #1f2f32; border-radius: 3px; padding: 12px 14px;"><div class="mono" style="color: #34d399; font-size: 11px; margin-bottom: 5px;">V3&middot;rain_segmented_outreach</div><div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">Personalized push 90m before rain keeps 94% on-site.</div></div>
+        <div style="background: rgba(52, 211, 153, 0.04); border: 0.5px solid #1f2f32; border-radius: 3px; padding: 12px 14px;"><div class="mono" style="color: #34d399; font-size: 11px; margin-bottom: 5px;">V3&middot;premier_covered_pref</div><div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">Premier visitors pick covered dining 4&times; more during weather.</div></div>
+        <div style="background: rgba(52, 211, 153, 0.04); border: 0.5px solid #1f2f32; border-radius: 3px; padding: 12px 14px;"><div class="mono" style="color: #34d399; font-size: 11px; margin-bottom: 5px;">V3&middot;rain_staff_preposition</div><div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">+2 wait staff before rain cuts complaints 68%.</div></div>
+        <div style="background: rgba(52, 211, 153, 0.04); border: 0.5px solid #1f2f32; border-radius: 3px; padding: 12px 14px;"><div class="mono" style="color: #34d399; font-size: 11px; margin-bottom: 5px;">V3&middot;outer_court_redirect</div><div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">First-timer push to outer courts converts at 31%.</div></div>
+        <div style="background: rgba(52, 211, 153, 0.04); border: 0.5px solid #1f2f32; border-radius: 3px; padding: 12px 14px;"><div class="mono" style="color: #34d399; font-size: 11px; margin-bottom: 5px;">V3&middot;rain_advance_window</div><div style="color: #b8c5c7; font-size: 12px; line-height: 1.6;">90-min advance warning is optimal retention threshold.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 4: LIVE BACKEND ===== -->
+  <div class="tab-pane" id="pane-live-backend">
+    <div style="background: #060f11; border: 0.5px solid #1f2f32; border-radius: 4px; padding: 18px 22px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 0.5px solid #1a2729;">
+        <div>
+          <div style="color: #b8c5c7; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 650;">Observability Console</div>
+          <div id="trace-status" style="color: #8a9b9d; font-size: 12px; line-height: 1.5; margin-top: 3px;">Checking Langfuse connection...</div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+          <button onclick="runTraceProbe('search')" style="background: rgba(52, 211, 153, 0.14); border: 1px solid rgba(52, 211, 153, 0.55); color: #34d399; border-radius: 5px; padding: 9px 12px; font-size: 12px; font-weight: 700; cursor: pointer;">Vector Search</button>
+          <button onclick="runTraceProbe('hybrid')" style="background: rgba(167, 139, 250, 0.14); border: 1px solid rgba(167, 139, 250, 0.55); color: #a78bfa; border-radius: 5px; padding: 9px 12px; font-size: 12px; font-weight: 700; cursor: pointer;">Hybrid Search</button>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px;">
+        <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+          <div style="color: #8a9b9d; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 5px;">Connection</div>
+          <div id="obs-connection" style="color: #fbbf24; font-size: 13px; font-weight: 600;">Pending</div>
+        </div>
+        <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+          <div style="color: #8a9b9d; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 5px;">Last Trace</div>
+          <div id="obs-trace-name" class="mono" style="color: #8a9b9d; font-size: 13px;">None yet</div>
+        </div>
+        <div style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 12px 14px;">
+          <div style="color: #8a9b9d; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 5px;">Trace Output</div>
+          <div id="obs-trace-output" style="color: #8a9b9d; font-size: 13px;">Waiting for retrieval</div>
+        </div>
+      </div>
+      <div id="trace-results" style="background: #0a1517; border: 0.5px solid #2a3f44; border-radius: 4px; padding: 14px 16px; color: #8a9b9d; font-size: 12px; line-height: 1.6; min-height: 92px; margin-bottom: 12px;">
+        Run a retrieval call to see the payload this app sends to Langfuse.
+      </div>
+      <div style="color: #6b7e80; font-size: 11px; line-height: 1.6;">
+        This tab shows local observability evidence: connection status, emitted trace name, and captured output. Open Langfuse to inspect persisted traces, timing, and history.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  const clockMap = {
+    'venue-ops': '2:15pm',
+    'scenario1': '2:15pm',
+    'outcomes': '10:00pm',
+    'live-backend': '2:15pm'
+  };
+  let activeTab = 'venue-ops';
+
+  function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('#tab-nav span[data-tab]').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+    document.querySelectorAll('.tab-pane').forEach(el => el.classList.toggle('active', el.id === 'pane-' + tab));
+    document.getElementById('header-clock').textContent = clockMap[tab] || '2:15pm';
+    const tab2Sub = document.getElementById('tab2-sub');
+    if (tab === 'outcomes') { tab2Sub.innerHTML = '<span class="check">\u2713</span>'; tab2Sub.style.color = '#34d399'; }
+    else { tab2Sub.innerHTML = '(rain)'; tab2Sub.style.color = tab === 'scenario1' ? '#34d399' : '#4a5a5c'; }
+  }
+  document.querySelectorAll('#tab-nav span[data-tab]').forEach(el => el.addEventListener('click', () => switchTab(el.dataset.tab)));
+  switchTab('venue-ops');
+
+  // ========== STEP ENGINE ==========
+  function createStepEngine(prefix, opts) {
+    let step = 0;
+    const maxStep = 5;
+    const manageButtons = !(opts && opts.externalButtons);
+
+    function updateUI() {
+      // Placeholder
+      const ph = document.getElementById(prefix + '-log-placeholder');
+      if (ph) ph.style.display = step === 0 ? 'block' : 'none';
+
+      // Button text (skip if external handler manages buttons)
+      if (manageButtons) {
+        const btn = document.getElementById(prefix + '-start-btn');
+        if (step === 0) { btn.textContent = '\u25B6 START'; btn.style.background = '#34d399'; btn.style.color = '#0a1517'; }
+        else if (step < maxStep) { btn.textContent = '\u25B6 NEXT'; btn.style.background = '#34d399'; btn.style.color = '#0a1517'; }
+        else { btn.textContent = '\u2713 DONE'; btn.style.background = 'transparent'; btn.style.color = '#34d399'; btn.style.border = '1px solid #34d399'; }
+      }
+
+      document.querySelectorAll('#' + prefix + '-progress [data-progress-step]').forEach(el => {
+        const s = parseInt(el.getAttribute('data-progress-step'));
+        el.classList.toggle('active', s === step);
+      });
+
+      // Reveal/dim Agent Log entries
+      document.querySelectorAll('[data-' + prefix + '-step].step-entry').forEach(el => {
+        const s = parseInt(el.getAttribute('data-' + prefix + '-step'));
+        if (s <= step) {
+          el.classList.add('revealed');
+          el.classList.toggle('dimmed', s < step);
+          el.classList.toggle('active-step', s === step);
+        } else {
+          el.classList.remove('revealed', 'dimmed', 'active-step');
+        }
+      });
+
+      // Reveal agent items on visitor view at step 4+
+      document.querySelectorAll('.agent-item[data-' + prefix + '-step]').forEach(el => {
+        const s = parseInt(el.getAttribute('data-' + prefix + '-step'));
+        if (step >= s) {
+          el.classList.add('revealed');
+          // Restore margin/padding that was zeroed
+          el.style.removeProperty('margin');
+          el.style.removeProperty('padding-top');
+          el.style.removeProperty('padding-bottom');
+        } else {
+          el.classList.remove('revealed');
+        }
+      });
+
+      // Focus highlighting: dim visitor view for steps 1-3, full for 4-5
+      const visitor = document.getElementById(prefix + '-visitor');
+      if (visitor) {
+        if (step >= 1 && step <= 3) visitor.style.opacity = '0.6';
+        else visitor.style.opacity = '1';
+      }
+
+      // Memory strip pulse at step 2, green flash at step 5
+      if (step === 2) {
+        ['f', 'm'].forEach(p => {
+          const mem = document.getElementById(prefix + '-mem-' + p);
+          if (mem) { mem.classList.remove('mem-pulse'); void mem.offsetWidth; mem.classList.add('mem-pulse'); }
+        });
+      }
+      if (step === 5) {
+        ['f', 'm'].forEach(p => {
+          const mem = document.getElementById(prefix + '-mem-' + p);
+          if (mem) { mem.classList.remove('mem-flash-green'); void mem.offsetWidth; mem.classList.add('mem-flash-green'); }
+        });
+      }
+    }
+
+    return {
+      advance: function() { if (step < maxStep) { step++; updateUI(); } },
+      reset: function() { step = 0; updateUI(); },
+      getStep: function() { return step; }
+    };
+  }
+
+  const s1Engine = createStepEngine('s1');
+
+  // ========== BACKEND TRACE CONTROLS ==========
+  async function refreshTraceStatus() {
+    const status = document.getElementById('trace-status');
+    if (!status) return;
+    try {
+      const response = await fetch('/api/observability/status');
+      if (!response.ok) throw new Error('status ' + response.status);
+      const data = await response.json();
+      const connection = document.getElementById('obs-connection');
+      status.textContent = data.langfuse_enabled ? 'Langfuse enabled · ' + data.langfuse_host : 'Langfuse not configured';
+      status.style.color = data.langfuse_enabled ? '#34d399' : '#fbbf24';
+      if (connection) {
+        connection.textContent = data.langfuse_enabled ? 'Enabled' : 'Not configured';
+        connection.style.color = data.langfuse_enabled ? '#34d399' : '#fbbf24';
+      }
+    } catch (error) {
+      const connection = document.getElementById('obs-connection');
+      status.textContent = 'Observability status unavailable';
+      status.style.color = '#f87171';
+      if (connection) {
+        connection.textContent = 'Unavailable';
+        connection.style.color = '#f87171';
+      }
+    }
+  }
+
+  window.runTraceProbe = async function(kind) {
+    const status = document.getElementById('trace-status');
+    const resultsBox = document.getElementById('trace-results');
+    const traceName = document.getElementById('obs-trace-name');
+    const traceOutput = document.getElementById('obs-trace-output');
+    if (status) {
+      status.textContent = kind === 'hybrid' ? 'Running hybrid retrieval...' : 'Running vector retrieval...';
+      status.style.color = '#b8c5c7';
+    }
+    if (traceName) {
+      traceName.textContent = 'Running...';
+      traceName.style.color = '#b8c5c7';
+    }
+    if (traceOutput) {
+      traceOutput.textContent = 'Pending';
+      traceOutput.style.color = '#b8c5c7';
+    }
+    if (resultsBox) {
+      resultsBox.textContent = 'Waiting for Atlas results...';
+    }
+
+    const url = kind === 'hybrid'
+      ? '/api/hybrid-search?q=rain%20hospitality%20reservation&namespace=guests'
+      : '/api/search?q=rain%20hospitality%20problems&namespace=guests';
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('status ' + response.status);
+      const data = await response.json();
+      const count = data.count || 0;
+      const label = kind === 'hybrid' ? 'api.hybrid_search' : 'api.search';
+      const top = data.results && data.results.length ? data.results[0] : null;
+      if (status) {
+        status.textContent = label + ' sent · ' + count + ' result' + (count === 1 ? '' : 's');
+        status.style.color = '#34d399';
+      }
+      if (traceName) {
+        traceName.textContent = label;
+        traceName.style.color = '#f0f6f7';
+      }
+      if (traceOutput) {
+        traceOutput.textContent = count + ' result' + (count === 1 ? '' : 's');
+        traceOutput.style.color = '#34d399';
+      }
+      if (resultsBox && top) {
+        const score = kind === 'hybrid' ? top.hybrid_score : top.score;
+        resultsBox.replaceChildren();
+
+        const labelEl = document.createElement('div');
+        labelEl.textContent = 'Langfuse output preview · top result';
+        labelEl.style.color = '#34d399';
+        labelEl.style.fontSize = '11px';
+        labelEl.style.letterSpacing = '0.06em';
+        labelEl.style.textTransform = 'uppercase';
+        labelEl.style.fontWeight = '700';
+        labelEl.style.marginBottom = '5px';
+
+        const metaEl = document.createElement('div');
+        metaEl.className = 'mono';
+        metaEl.textContent = (top.id || 'unknown') + ' · score ' + score;
+        metaEl.style.color = '#f0f6f7';
+        metaEl.style.fontSize = '12px';
+        metaEl.style.marginBottom = '4px';
+
+        const textEl = document.createElement('div');
+        textEl.textContent = (top.text || '').slice(0, 220);
+        textEl.style.color = '#b8c5c7';
+        textEl.style.fontSize = '12px';
+
+        resultsBox.append(labelEl, metaEl, textEl);
+      } else if (resultsBox) {
+        resultsBox.textContent = 'No results returned.';
+      }
+    } catch (error) {
+      if (status) {
+        status.textContent = 'Retrieval call failed';
+        status.style.color = '#f87171';
+      }
+      if (traceName) {
+        traceName.textContent = 'Failed';
+        traceName.style.color = '#f87171';
+      }
+      if (traceOutput) {
+        traceOutput.textContent = 'No trace emitted';
+        traceOutput.style.color = '#f87171';
+      }
+      if (resultsBox) {
+        resultsBox.textContent = 'The retrieval endpoint did not return successfully.';
+      }
+    }
+  };
+
+  refreshTraceStatus();
+
+  // ========== TAB 2: CLICK-BY-CLICK (unchanged) ==========
+  window.s1Advance = function() { s1Engine.advance(); };
+  window.s1Reset = function() { s1Engine.reset(); };
+
+
+  // ========== PERSONA TOGGLES ==========
+  function createPersonaToggle(prefix) {
+    return function(persona) {
+      const f = document.getElementById(prefix + '-frankie');
+      const m = document.getElementById(prefix + '-miki');
+      const btnF = document.getElementById(prefix + '-btn-frankie');
+      const btnM = document.getElementById(prefix + '-btn-miki');
+      const pill = document.getElementById(prefix + '-agent-pill');
+      if (persona === 'frankie') {
+        f.style.display = 'block'; m.style.display = 'none';
+        btnF.style.background = 'rgba(96, 165, 250, 0.15)'; btnF.style.border = '1px solid rgba(96, 165, 250, 0.5)'; btnF.style.color = '#60a5fa'; btnF.style.fontWeight = '600';
+        btnM.style.background = 'transparent'; btnM.style.border = '1px solid #2a3f44'; btnM.style.color = '#8a9b9d'; btnM.style.fontWeight = 'normal';
+        if (pill) pill.className = 'agent-pill-blue';
+      } else {
+        f.style.display = 'none'; m.style.display = 'block';
+        btnF.style.background = 'transparent'; btnF.style.border = '1px solid #2a3f44'; btnF.style.color = '#8a9b9d'; btnF.style.fontWeight = 'normal';
+        btnM.style.background = 'rgba(167, 139, 250, 0.15)'; btnM.style.border = '1px solid rgba(167, 139, 250, 0.5)'; btnM.style.color = '#a78bfa'; btnM.style.fontWeight = '600';
+        if (pill) pill.className = 'agent-pill-purple';
+      }
+    };
+  }
+  window.s1Toggle = createPersonaToggle('s1');
+})();
+</script>
+
+</body>
+</html>
