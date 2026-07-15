@@ -49,10 +49,7 @@ CLAUDE_VISION_MODEL: Final[str] = "claude-sonnet-4-5"
 
 MONGODB_URI: Final[str] = os.environ.get("MONGODB_URI", "")
 MONGODB_DATABASE: Final[str] = os.environ.get("MONGODB_DATABASE", "event_venue_operator")
-MONGODB_APP_NAME: Final[str] = os.environ.get(
-    "MONGODB_APP_NAME",
-    "devrel-github-atlas-langgraph-marktechpost",
-)
+MONGODB_APP_NAME: Final[str] = "devrel-github-agentic_retrieval-memory-marktechpost"
 
 # Operational collections
 COLLECTION_GUESTS: Final[str] = "guests"

@@ -47,7 +47,6 @@ Required for the hosted backend proof points:
 ```bash
 MONGODB_URI=<atlas-connection-string>
 MONGODB_DATABASE=event_venue_operator
-MONGODB_APP_NAME=devrel-github-atlas-langgraph-marktechpost
 VOYAGE_API_KEY=<voyage-key>
 ```
 
