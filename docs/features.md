@@ -127,7 +127,7 @@ endpoint.
 | **Three-tab story flow + Live Backend tab** | Venue Ops, Scenario (rain), and Final Outcomes match the stage narrative; Live Backend validates retrieval and optional Langfuse traces. | V1 |
 | **API endpoints** | `/api/search`, `/api/hybrid-search`, `/api/unified-search`, `/api/vision-rag/query`, `/api/stats`, and debug endpoints exercise the live backend separately from the scripted UI. | V1 |
 | **Smoke test** | `scripts/smoke_test.py` validates health, vector search, hybrid search, visual docs, Vision RAG, Langfuse wiring, and stats against the running server. | V1 |
-| **Atlas appName** | MongoDB connections use `MONGODB_APP_NAME`, defaulting to `devrel-github-atlas-langgraph-marktechpost` for GitHub attribution. | V1 |
+| **Atlas appName** | MongoDB connections use the hard-coded `appName` `devrel-github-agentic_retrieval-memory-marktechpost` for GitHub attribution. | V1 |
 
 The static UI is the locked stage surface for this repo. V2 may wire more of
 the UI to live endpoints, but V1 treats the UI as the guided narrative and the

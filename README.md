@@ -87,11 +87,6 @@ cp .env.example .env
 # Optional: LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
 ```
 
-`MONGODB_APP_NAME` defaults to `devrel-github-atlas-langgraph-marktechpost`
-so Atlas connections from the GitHub repo are trackable. If you adapt this for
-a published tutorial, use a distinct content app name such as
-`devrel-tutorial-atlas-langgraph-marktechpost`.
-
 ### Initialize Atlas
 
 ```bash
